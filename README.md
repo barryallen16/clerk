@@ -1,16 +1,16 @@
 # Clerk
 
 An offline HR assistant that answers policy questions with semantic retrieval and manages leave balances through procedural tool calling.
-Runs locally against LM Studio with zero external cloud dependencies.
+Runs locally against Ollama or LM Studio with zero external cloud dependencies.
 
 [![CI](https://github.com/barryallen16/clerk/actions/workflows/ci.yml/badge.svg)](https://github.com/barryallen16/clerk/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![Python](https://img.shields.io/badge/python-3.12-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Local](https://img.shields.io/badge/inference-fully%20offline-orange)
+![Local](https://img.shields.io/badge/inference-Ollama%20%7C%20LM%20Studio-orange)
 
 | CLI Terminal Interface | Web Browser UI |
 | :---: | :---: |
-| ![CLI Interface](docs/demo.gif) | ![Web Interface](docs/ui-demo.gif) |
+| ![CLI Interface](docs/demo.png) | ![Web Interface](docs/ui-demo.gif) |
 
 ## Why Clerk Exists
 
@@ -33,7 +33,7 @@ flowchart TD
     end
     
     Orchestrator --> WindowCap
-    WindowCap --> LLM["Local Inference (LM Studio on :1234/v1)"]
+    WindowCap --> LLM["Local Inference (Ollama / LM Studio)"]
     
     LLM -- "vector_search_hr_policy" --> Chroma["ChromaDB (Hierarchical Markdown Chunks)"]
     Chroma --> LLM
@@ -49,18 +49,32 @@ flowchart TD
 
 ## Quick Start
 
-Install dependencies with `uv` in one block:
+Install dependencies with `uv` in one step:
 
 ```bash
 git clone https://github.com/barryallen16/clerk.git
 cd clerk
-uv venv && uv pip install -e ".[dev,serve]"
+uv sync --all-extras
 cp .env.example .env
 ```
 
-Start LM Studio on `http://localhost:1234/v1` with any function-calling model (such as Llama-3-8B-Instruct or Mistral-7B).
+Configure your local model in `.env`:
+
+```ini
+# For Ollama (default on :11434):
+LLM_BASE_URL=http://localhost:11434/v1
+API_KEY=ollama
+MODEL_NAME=lfm3-vl:latest
+
+# Or for LM Studio (on :1234):
+# LLM_BASE_URL=http://localhost:1234/v1
+# API_KEY=lm-studio
+# MODEL_NAME=local-model
+```
 
 ### Interactive CLI
+
+Start the interactive terminal session:
 
 ```bash
 uv run python main.py
@@ -72,7 +86,7 @@ Run a one-shot query:
 uv run python main.py "What is the notice period during probation?"
 ```
 
-Run the demo query flow:
+Run the deterministic demo query sequence:
 
 ```bash
 uv run python main.py --demo
@@ -80,24 +94,24 @@ uv run python main.py --demo
 
 ### Web Interface
 
-Start the API service:
+Start the local API service:
 
 ```bash
 uv run uvicorn api:app --reload
 ```
 
-Open `ui/index.html` in your browser.
-The interface communicates with the backend on `http://localhost:8000/query`.
+Open `http://localhost:8000` in your browser.
+The interface automatically loads `ui/index.html` and routes queries to `/query`.
 
 ## Verification & Evaluation
 
-Run the automated test suite across all unit, vector, orchestrator, and API tests:
+Run the automated test suite across unit, vector, orchestrator, and API tests:
 
 ```bash
 uv run pytest
 ```
 
-Run the deterministic golden evaluation harness:
+Run the deterministic evaluation harness:
 
 ```bash
 uv run python eval/run_eval.py

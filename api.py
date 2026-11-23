@@ -1,12 +1,15 @@
 import os
+import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from agent.orchestrator import run_agentic_workflow
+from config import SQL_DB_PATH
 from database.relational import init_relational_db
 from database.vector import init_vector_db
 
@@ -39,6 +42,31 @@ class QueryIn(BaseModel):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/")
+def root():
+    return RedirectResponse(url="/ui")
+
+
+class ResetIn(BaseModel):
+    employee_id: str | None = None
+
+
+@app.post("/reset")
+def reset_session(
+    r: ResetIn | None = None,
+    x_employee_id: str = Header(default="", alias="X-Employee-ID"),
+):
+    emp_id = (x_employee_id or (r.employee_id if r else "") or "EMP123").strip()
+    with sqlite3.connect(SQL_DB_PATH) as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS sessions (emp_id TEXT PRIMARY KEY, history TEXT NOT NULL, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)"
+        )
+        conn.execute("DELETE FROM sessions WHERE emp_id=?", (emp_id,))
+        conn.execute("UPDATE employees SET casual_balance=12, medical_balance=10 WHERE emp_id=?", (emp_id,))
+        conn.commit()
+    return {"status": "ok", "message": f"Session and leave balances reset for {emp_id}"}
 
 
 @app.post("/query", dependencies=[Depends(verify_key)])

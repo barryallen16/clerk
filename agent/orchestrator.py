@@ -84,7 +84,8 @@ SYSTEM_PROMPT = (
     "vector_search_hr_policy. Never call submit_leave_request for policy questions. "
     "Example: 'How many casual leaves per year?' -> call vector_search_hr_policy with query 'casual leave allowance per year'. "
     "Only call submit_leave_request when the user explicitly asks to book/apply/deduct leave AND provides leave type, start date, and days. "
-    "Never invent dates or employee IDs. If required info is missing, ask the user instead of guessing."
+    "Never invent dates or employee IDs. If required info is missing, ask the user instead of guessing. "
+    "Output constraint: Be concise. Answer in 1-2 sentences maximum directly stating the facts. Never generate markdown tables, checklists, or unsolicited explanations."
 )
 
 
@@ -127,12 +128,12 @@ def run_agentic_workflow(user_prompt, employee_id="EMP123", history=None):
             _save_history(employee_id, serializable)
             return {"tools": tools_called, "answer": "", "history": serializable}
         msg = resp.choices[0].message
+        messages.append(_msg_to_dict(msg))
         if not msg.tool_calls:
             log.info("Final agent response: %s", msg.content)
             serializable = [_msg_to_dict(m) for m in messages[1:]]
             _save_history(employee_id, serializable)
             return {"tools": tools_called, "answer": msg.content or "", "history": serializable}
-        messages.append(_msg_to_dict(msg))
         for tc in msg.tool_calls:
             name = tc.function.name
             try:
