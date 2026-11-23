@@ -8,9 +8,7 @@ Runs locally against Ollama or LM Studio with zero external cloud dependencies.
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Local](https://img.shields.io/badge/inference-Ollama%20%7C%20LM%20Studio-orange)
 
-| CLI Terminal Interface | Web Browser UI |
-| :---: | :---: |
-| ![CLI Interface](docs/demo.png) | ![Web Interface](docs/ui-demo.gif) |
+![Clerk UI Demo](docs/ui-demo.gif)
 
 ## Why Clerk Exists
 
