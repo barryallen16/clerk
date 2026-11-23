@@ -36,10 +36,14 @@ form.addEventListener("submit", async (e) => {
   btn.disabled = true; q.disabled = true;
   const loader = loadingBubble();
   try {
+    const empId = emp.value.trim() || "EMP101";
     const res = await fetch("/query", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: text, employee_id: emp.value.trim() || "EMP101" }),
+      headers: {
+        "Content-Type": "application/json",
+        "X-Employee-ID": empId
+      },
+      body: JSON.stringify({ query: text, employee_id: empId }),
     });
     const data = await res.json();
     loader.remove();
@@ -47,7 +51,7 @@ form.addEventListener("submit", async (e) => {
   } catch (err) {
     loader.remove();
     q.value = text;
-    bubble("agent", "Network error: " + err.message + " — your text is restored.");
+    bubble("agent", "Network error: " + err.message + " - your text is restored.");
   } finally {
     btn.disabled = q.value.trim() === ""; q.disabled = false; q.focus();
   }

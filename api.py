@@ -33,7 +33,7 @@ def verify_key(x_api_key: str = Header(default="")):
 
 class QueryIn(BaseModel):
     query: str
-    employee_id: str = "EMP101"
+    employee_id: str | None = None
 
 
 @app.get("/health")
@@ -42,5 +42,19 @@ def health():
 
 
 @app.post("/query", dependencies=[Depends(verify_key)])
-def query(q: QueryIn):
-    return run_agentic_workflow(q.query, employee_id=q.employee_id)
+def query(
+    q: QueryIn,
+    x_employee_id: str = Header(default="", alias="X-Employee-ID"),
+):
+    header_id = x_employee_id.strip()
+    if header_id:
+        if q.employee_id and q.employee_id != header_id:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Forbidden: Cannot execute actions as '{q.employee_id}' while authenticated as '{header_id}'",
+            )
+        caller_id = header_id
+    else:
+        caller_id = q.employee_id or "EMP101"
+
+    return run_agentic_workflow(q.query, employee_id=caller_id)

@@ -48,3 +48,32 @@ def test_multi_turn_session(client, monkeypatch):
 
     # Session history persisted in SQLite via orchestrator
     assert len(calls) == 2
+
+
+def test_impersonation_blocked(client):
+    r = client.post(
+        "/query",
+        json={"query": "Deduct casual leave", "employee_id": "EMP999"},
+        headers={"X-Employee-ID": "EMP101"},
+    )
+    assert r.status_code == 403
+    assert "Forbidden" in r.json()["detail"]
+
+
+def test_header_identity_authoritative(client, monkeypatch):
+    captured_id = None
+
+    def mock_run(q, employee_id=""):
+        nonlocal captured_id
+        captured_id = employee_id
+        return {"tools": [], "answer": "ok"}
+
+    monkeypatch.setattr(api, "run_agentic_workflow", mock_run)
+    r = client.post(
+        "/query",
+        json={"query": "Check balance"},
+        headers={"X-Employee-ID": "EMP102"},
+    )
+    assert r.status_code == 200
+    assert captured_id == "EMP102"
+

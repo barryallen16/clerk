@@ -1,4 +1,4 @@
-mcp_tools = [
+hr_agent_tools = [
     {
         "type": "function",
         "function": {
@@ -31,3 +31,6 @@ mcp_tools = [
         }
     }
 ]
+
+# Backward compatibility alias
+mcp_tools = hr_agent_tools

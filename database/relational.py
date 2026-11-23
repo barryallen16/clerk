@@ -6,7 +6,10 @@ from datetime import datetime
 
 from config import EMPLOYEES_CSV_PATH, SQL_DB_PATH
 
-LEAVE_TYPES = {"medical", "casual"}
+LEAVE_BALANCE_COLS = {
+    "medical": "medical_balance",
+    "casual": "casual_balance",
+}
 
 
 @contextmanager
@@ -65,13 +68,13 @@ def _validate_date(s: str) -> bool:
 
 def submit_leave_request(employee_id, leave_type, start_date, total_days):
     leave_type = (leave_type or "").lower()
-    if leave_type not in LEAVE_TYPES:
+    col = LEAVE_BALANCE_COLS.get(leave_type)
+    if not col:
         return json.dumps({"status": "error", "message": f"Unknown leave type: {leave_type}"})
     if not _validate_date(start_date):
         return json.dumps({"status": "error", "message": "start_date must be YYYY-MM-DD"})
     if not isinstance(total_days, int) or total_days <= 0:
         return json.dumps({"status": "error", "message": "total_days must be a positive int"})
-    col = f"{leave_type}_balance"
     with _conn() as conn:
         row = conn.execute(f"SELECT {col} FROM employees WHERE emp_id=?", (employee_id,)).fetchone()
         if not row:

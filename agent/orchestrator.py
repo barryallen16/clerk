@@ -2,10 +2,11 @@ import json
 import logging
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime
 
 from openai import OpenAI
 
-from agent.tools import mcp_tools
+from agent.tools import hr_agent_tools
 from config import API_KEY, LLM_BASE_URL, MODEL_NAME, SQL_DB_PATH
 from database.relational import submit_leave_request
 from database.vector import vector_search_hr_policy
@@ -74,7 +75,17 @@ def _save_history(employee_id: str, history):
 
 
 MAX_ITERS = 5
-SYSTEM_PROMPT = "You are an enterprise HR automation agent. Employee ID: {employee_id}. Dates YYYY-MM-DD. Rules: For ANY HR policy question, you MUST call vector_search_hr_policy before answering; never answer policy questions from memory. Never state a policy fact without first calling vector_search_hr_policy. Never call submit_leave_request for policy questions. Example: 'How many casual leaves per year?' -> call vector_search_hr_policy with query 'casual leave allowance per year'. Only call submit_leave_request when the user explicitly asks to book/apply/deduct leave AND provides leave type, start date, and days. Never invent dates or employee IDs. If required info is missing, ask the user instead of guessing."
+MAX_HISTORY_MESSAGES = 20
+SYSTEM_PROMPT = (
+    "You are an enterprise HR automation agent. Employee ID: {employee_id}. "
+    "Today's Date: {today_date}. Dates format: YYYY-MM-DD. "
+    "Rules: For ANY HR policy question, you MUST call vector_search_hr_policy before answering; "
+    "never answer policy questions from memory. Never state a policy fact without first calling "
+    "vector_search_hr_policy. Never call submit_leave_request for policy questions. "
+    "Example: 'How many casual leaves per year?' -> call vector_search_hr_policy with query 'casual leave allowance per year'. "
+    "Only call submit_leave_request when the user explicitly asks to book/apply/deduct leave AND provides leave type, start date, and days. "
+    "Never invent dates or employee IDs. If required info is missing, ask the user instead of guessing."
+)
 
 
 def _msg_to_dict(msg):
@@ -98,17 +109,18 @@ def _msg_to_dict(msg):
 def run_agentic_workflow(user_prompt, employee_id="EMP123", history=None):
     if history is None:
         history = _load_history(employee_id)
-    messages = [{"role": "system", "content": SYSTEM_PROMPT.format(employee_id=employee_id)}]
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    messages = [{"role": "system", "content": SYSTEM_PROMPT.format(employee_id=employee_id, today_date=today_str)}]
     tools_called = []
     if history:
-        messages.extend(history)
+        messages.extend(history[-MAX_HISTORY_MESSAGES:])
     messages.append({"role": "user", "content": user_prompt})
     log.info("User query: %s", user_prompt)
 
     for i in range(MAX_ITERS):
         tc = "auto"
         try:
-            resp = _get_client().chat.completions.create(model=MODEL_NAME, messages=messages, tools=mcp_tools, tool_choice=tc)
+            resp = _get_client().chat.completions.create(model=MODEL_NAME, messages=messages, tools=hr_agent_tools, tool_choice=tc)
         except Exception:
             log.exception("LLM call failed")
             serializable = [_msg_to_dict(m) for m in messages[1:]]
@@ -133,8 +145,13 @@ def run_agentic_workflow(user_prompt, employee_id="EMP123", history=None):
                 result = vector_search_hr_policy(args.get("query", ""))
             elif name == "submit_leave_request":
                 import re
-                booking_kw = any(k in user_prompt.lower() for k in ["book", "apply", "deduct", "request", "take"])
-                has_date = bool(re.search(r"\d{4}-\d{2}-\d{2}", user_prompt))
+                user_turns = [
+                    m.get("content", "") for m in messages
+                    if isinstance(m, dict) and m.get("role") == "user"
+                ]
+                combined_user_text = " ".join(user_turns).lower()
+                booking_kw = any(k in combined_user_text for k in ["book", "apply", "deduct", "request", "take"])
+                has_date = bool(re.search(r"\d{4}-\d{2}-\d{2}", combined_user_text))
                 if not (booking_kw and has_date):
                     result = json.dumps({"status": "error", "message": "Not an explicit booking request; ask user for details."})
                     messages.append({"role": "tool", "tool_call_id": tc.id, "name": name, "content": str(result)})
