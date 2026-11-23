@@ -13,3 +13,4 @@ VECTOR_DB_PATH = os.getenv("VECTOR_DB_PATH", "./chroma_hr_db")
 
 EMPLOYEES_CSV_PATH = os.getenv("EMPLOYEES_CSV_PATH", "data/employees.csv")
 POLICIES_CSV_PATH = os.getenv("POLICIES_CSV_PATH", "data/hr_policies.csv")
+HANDBOOK_MD_PATH = os.getenv("HANDBOOK_MD_PATH", "data/employee_handbook.md")

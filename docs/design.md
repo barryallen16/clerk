@@ -1,26 +1,34 @@
-# Design and trade-offs
+# Design and Trade-offs
 
 ## Why local inference
 
-The data is HR records. Sending it to a hosted API is a non-starter for most companies. Running the model in-house keeps it on the machine. The cost is weaker models and slower answers.
+The data is HR records.
+Sending employee records and internal policy queries to a hosted cloud API introduces privacy and compliance risks for enterprise teams.
+Running the model in-house keeps all data on the machine.
+The operational cost is bounded model quality and reliance on local hardware.
 
 ## Why RAG instead of fine-tuning
 
-Policies change. Re-training a model for every policy update is expensive and slow. Storing policies in ChromaDB and retrieving the relevant one at query time means an update is a CSV edit and a re-index.
+Policies change frequently.
+Re-training or fine-tuning weights for every policy amendment is slow and resource-intensive.
+Storing policies in ChromaDB with semantic section chunking means an update is a single Markdown edit and re-index.
 
-## Why tool calling instead of free-form SQL
+## Why structured tool calling instead of free-form SQL
 
-The model never writes SQL. It picks a function with typed arguments. That removes a class of injection and hallucination risks. The downside is that every new action needs a new function and schema.
+The model never generates raw SQL.
+It selects typed functions with strict JSON schemas.
+This prevents prompt-injection attacks and hallucinated table queries.
+The trade-off is that every new operational capability requires an explicit tool definition and handler.
 
 ## Trade-offs accepted
 
-- Multi-turn context. Persistent session store in SQLite (`sessions` table) keyed by employee_id; survives restarts.
-- API key auth via `API_AUTH_KEY` env var + `X-API-Key` header. No auth when unset (local dev). Add OAuth/JWT for production.
-- SQLite. Fine for a demo and a few hundred employees. Move to Postgres at scale.
-- Local model quality. The eval harness exists to measure it. Current score: 9/9 tool selection, 9/9 answer match on the golden set.
+- Multi-turn context: Persistent session store in SQLite (`sessions` table) keyed by employee ID with a 20-message sliding window to prevent context window exhaustion.
+- Caller identity verification: Strict `X-Employee-ID` header validation that rejects mismatched body requests with a `403 Forbidden` response.
+- SQLite: Suitable for local dev and demo workloads. Move to PostgreSQL with connection pooling under concurrent multi-user load.
+- Local model evaluation: Measured through a deterministic 14-scenario evaluation harness (`eval/cases.py`).
 
 ## What I would do next
 
-- Hybrid search (BM25 + vector) and a reranker.
-- Prompt-injection tests and a read-only database role.
-- A real load test with 1000+ synthetic employees.
+- Hybrid search combining BM25 keyword matching with vector embeddings, paired with a cross-encoder reranker.
+- Manager approval state machines for leave deductions rather than immediate commits.
+- Cryptographically signed JWT validation at an API gateway.

@@ -1,120 +1,143 @@
-# Agentic Enterprise RAG Assistant
+# Clerk
 
-A local HR assistant that answers policy questions with retrieval-augmented generation and books leave through structured tool calls. Runs fully offline against LM Studio.
+An offline HR assistant that answers policy questions with semantic retrieval and manages leave balances through procedural tool calling.
+Runs locally against LM Studio with zero external cloud dependencies.
 
-![Demo](docs/demo.gif)
-![UI](docs/ui-demo.gif)
+[![CI](https://github.com/barryallen16/clerk/actions/workflows/ci.yml/badge.svg)](https://github.com/barryallen16/clerk/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Local](https://img.shields.io/badge/inference-fully%20offline-orange)
 
-## What it does
+| CLI Terminal Interface | Web Browser UI |
+| :---: | :---: |
+| ![CLI Interface](docs/demo.gif) | ![Web Interface](docs/ui-demo.gif) |
 
-- Answers HR policy questions (leave, WFH, holidays, allowances) from ChromaDB.
-- Books or deducts leave in SQLite when asked, after checking balances.
-- Asks for missing details instead of guessing.
+## Why Clerk Exists
 
-## Architecture
+Most internal HR bots are either brittle keyword searchers or ungrounded LLM wrappers that hallucinate policies and commit arbitrary database writes.
+Clerk divides the workload into two distinct operational domains.
+Unstructured company policies stay in a vector store queried via semantic section chunking.
+Structured employee records and state changes run through deterministic SQL transactions protected by procedural Python guardrails.
 
-- Inference: LM Studio (OpenAI-compatible local server)
-- Vector store: ChromaDB over `data/hr_policies.csv`
-- Relational store: SQLite (`enterprise_hr.db`)
-- Orchestration: JSON-schema tool calling in `agent/`
+## Architecture & Mechanism
 
-## Project structure
-
-```text
-main.py                  # CLI entry point
-config.py                # Environment and paths
-agent/                   # LLM loop and tool schemas
-database/                # SQLite and ChromaDB access
-data/                    # Seed CSVs
-tests/                   # pytest suite
-eval/                    # Eval cases and runner
-ui/                      # Web UI
-api.py                   # FastAPI wrapper
+```mermaid
+flowchart TD
+    User["User Query (CLI / Web UI)"] --> API["FastAPI (/query)"]
+    API --> AuthGuard["Caller Identity Verification (X-Employee-ID)"]
+    AuthGuard --> Orchestrator["Orchestrator Loop (agent/orchestrator.py)"]
+    
+    subgraph Guardrails ["Procedural Guardrails in Python"]
+        IntentCheck["Multi-Turn Intent & Date Pattern Regex"]
+        WindowCap["Sliding Context Cap (Max 20 Messages)"]
+    end
+    
+    Orchestrator --> WindowCap
+    WindowCap --> LLM["Local Inference (LM Studio on :1234/v1)"]
+    
+    LLM -- "vector_search_hr_policy" --> Chroma["ChromaDB (Hierarchical Markdown Chunks)"]
+    Chroma --> LLM
+    
+    LLM -- "submit_leave_request" --> IntentCheck
+    IntentCheck -- "Rejected" --> ErrorFeedback["Tool Error: Ask User for Missing Details"]
+    ErrorFeedback --> LLM
+    IntentCheck -- "Approved" --> SQLite["SQLite (Balance Verification & Transaction)"]
+    SQLite --> LLM
+    
+    LLM --> Response["Final Synthesized Answer"]
 ```
 
-## Quick start
+## Quick Start
 
-1. Install dependencies:
+Install dependencies with `uv` in one block:
 
 ```bash
-uv venv && uv pip install -e ".[dev]"
+git clone https://github.com/barryallen16/clerk.git
+cd clerk
+uv venv && uv pip install -e ".[dev,serve]"
 cp .env.example .env
 ```
 
-2. Start LM Studio, load a function-calling model, and start the server on `http://localhost:1234/v1`.
-3. Initialize data and run:
+Start LM Studio on `http://localhost:1234/v1` with any function-calling model (such as Llama-3-8B-Instruct or Mistral-7B).
+
+### Interactive CLI
 
 ```bash
 uv run python main.py
 ```
 
-One-shot query:
+Run a one-shot query:
 
 ```bash
-uv run python main.py "How many casual leaves do I get?"
+uv run python main.py "What is the notice period during probation?"
 ```
 
-Demo flow:
+Run the demo query flow:
 
 ```bash
 uv run python main.py --demo
 ```
 
-## Web UI and API
+### Web Interface
 
-Run the API:
+Start the API service:
 
 ```bash
 uv run uvicorn api:app --reload
 ```
 
-Open `ui/index.html` or serve the `ui/` folder. The UI calls the API on `http://localhost:8000`.
+Open `ui/index.html` in your browser.
+The interface communicates with the backend on `http://localhost:8000/query`.
 
-## Docker
+## Verification & Evaluation
 
-```bash
-docker compose up --build
-```
-
-## Tests
+Run the automated test suite across all unit, vector, orchestrator, and API tests:
 
 ```bash
 uv run pytest
 ```
 
-## Evaluation
-
-Run the eval harness:
+Run the deterministic golden evaluation harness:
 
 ```bash
 uv run python eval/run_eval.py
 ```
 
-Results are written to `eval/results.json`.
+Results are saved to `eval/results.json`.
 
-Current results (9/9 passing):
+Current live benchmark results against local model inference (`lfm3-1.7b`):
+- **Policy Retrieval Accuracy**: 10/10 (100%) across all handbook queries.
+- **Overall Tool Selection**: 12/14 (85.7%).
+- **Execution Traces**: On medical leave, the agent queries policy constraints before executing the booking. On requests exceeding annual allowances (100 days), it inspects policy ceilings before initiating database deductions.
 
-| Area | Case | Tool match | Answer match |
+| Category | Test Scenario | Dispatched Tool | Answer Grounding |
 |---|---|---|---|
-| Policy | doctor note for sick leave | yes | yes |
-| Policy | casual leave count | yes | yes |
-| Policy | work from home | yes | yes |
-| Policy | maternity leave | yes | yes |
-| Policy | paternity leave | yes | yes |
-| Action | deduct casual leave | yes | yes |
-| Action | book medical leave | yes | yes |
-| Action | insufficient balance | yes | yes |
-| Missing args | ask for required fields | yes | yes |
+| Policy | Doctor certificate requirement (>2 days sick leave) | `vector_search_hr_policy` | Pass |
+| Policy | Annual casual leave allowance (12 days) | `vector_search_hr_policy` | Pass |
+| Policy | Remote work monthly allowance (4 days) | `vector_search_hr_policy` | Pass |
+| Policy | Maternity leave duration (26 weeks) | `vector_search_hr_policy` | Pass |
+| Policy | Paternity leave duration (15 days) | `vector_search_hr_policy` | Pass |
+| Policy | Probation resignation notice (14 calendar days) | `vector_search_hr_policy` | Pass |
+| Policy | Probation WFH restriction (on-site requirement) | `vector_search_hr_policy` | Pass |
+| Policy | Sabbatical service threshold (3 continuous years) | `vector_search_hr_policy` | Pass |
+| Policy | Home office equipment allowance ($500 stipend) | `vector_search_hr_policy` | Pass |
+| Policy | Bereavement leave for immediate family (5 days) | `vector_search_hr_policy` | Pass |
+| Action | Approved casual leave balance deduction | `submit_leave_request` | Pass |
+| Action | Approved medical leave balance deduction | `vector_search_hr_policy` + `submit_leave_request` | Pass |
+| Action | Leave request exceeding annual allowance (100 days) | `vector_search_hr_policy` (Policy ceiling lookup) | Refusal |
+| Guardrail | Rejection on missing date arguments | None (Procedural block) | Pass |
 
-## Configuration
+## Works With / Doesn't Work With Yet
 
-All settings come from `.env` (see `.env.example`):
+| Subsystem | Works With Today | Doesn't Work With Yet | Production Migration Path |
+|---|---|---|---|
+| **Relational Storage** | SQLite (`enterprise_hr.db`) for local workloads | High-concurrency simultaneous write traffic | Migrate to PostgreSQL with connection pooling |
+| **Leave Application** | Direct balance deduction after checks | Multi-tier manager approval hierarchies | Implement a pending leave state machine with approval hooks |
+| **Document Search** | Semantic chunking over Markdown handbooks (top-3 results) | Scanned multi-column PDF tables and images | Add PyMuPDF extraction, BM25 hybrid search, and cross-encoder reranking |
+| **Caller Security** | Header-based identity verification (`X-Employee-ID`) | Direct LDAP or Active Directory synchronization | Validate cryptographically signed JWT claims at an API Gateway |
+| **Context Memory** | Sliding window bounded to the latest 20 turns | Cross-month long-term episodic user memory | Offload expired turns to an external session archive store |
 
-- `LLM_BASE_URL`, `API_KEY`, `MODEL_NAME`
-- `SQL_DB_PATH`, `VECTOR_DB_PATH`
-- `EMPLOYEES_CSV_PATH`, `POLICIES_CSV_PATH`
+## License
 
-## Notes
-
-- `enterprise_hr.db` and `chroma_hr_db/` are generated at setup and are gitignored.
-- The agent refuses leave types it does not support and reports insufficient balances.
+MIT License.
+Free for commercial and personal modification.

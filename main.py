@@ -6,10 +6,10 @@ from database.vector import init_vector_db
 
 
 def setup():
-    print("Initializing Enterprise Infrastructure...")
+    print("Initializing Clerk local databases...")
     init_relational_db()
     init_vector_db()
-    print("System Ready.\n")
+    print("Clerk ready.\n")
 
 def main():
     parser = argparse.ArgumentParser()

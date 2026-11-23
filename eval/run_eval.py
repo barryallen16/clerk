@@ -11,6 +11,7 @@ os.environ["SQL_DB_PATH"] = str(tmp / "t.db")
 os.environ["VECTOR_DB_PATH"] = str(tmp / "chroma")
 os.environ["EMPLOYEES_CSV_PATH"] = str(ROOT / "data" / "employees.csv")
 os.environ["POLICIES_CSV_PATH"] = str(ROOT / "data" / "hr_policies.csv")
+os.environ["HANDBOOK_MD_PATH"] = str(ROOT / "data" / "employee_handbook.md")
 
 from agent.orchestrator import run_agentic_workflow
 from database.relational import init_relational_db

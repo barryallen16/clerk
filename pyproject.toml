@@ -1,7 +1,7 @@
 [project]
-name = "hr-rag-agent"
+name = "clerk"
 version = "0.1.0"
-description = "Agentic HR assistant: RAG over policies + SQL tool calling, fully local."
+description = "Local HR assistant: RAG over policies + SQL tool calling, fully offline."
 requires-python = ">=3.11"
 dependencies = [
     "openai>=1.40",

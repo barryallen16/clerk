@@ -40,6 +40,46 @@
     "answer_match": true
   },
   {
+    "id": "policy_probation_notice",
+    "tools": [
+      "vector_search_hr_policy"
+    ],
+    "tool_match": true,
+    "answer_match": true
+  },
+  {
+    "id": "policy_probation_wfh",
+    "tools": [
+      "vector_search_hr_policy"
+    ],
+    "tool_match": true,
+    "answer_match": true
+  },
+  {
+    "id": "policy_sabbatical",
+    "tools": [
+      "vector_search_hr_policy"
+    ],
+    "tool_match": true,
+    "answer_match": true
+  },
+  {
+    "id": "policy_equipment_stipend",
+    "tools": [
+      "vector_search_hr_policy"
+    ],
+    "tool_match": true,
+    "answer_match": true
+  },
+  {
+    "id": "policy_bereavement",
+    "tools": [
+      "vector_search_hr_policy"
+    ],
+    "tool_match": true,
+    "answer_match": true
+  },
+  {
     "id": "action_casual_ok",
     "tools": [
       "submit_leave_request"
@@ -50,18 +90,20 @@
   {
     "id": "action_medical_ok",
     "tools": [
+      "vector_search_hr_policy",
+      "vector_search_hr_policy",
       "submit_leave_request"
     ],
-    "tool_match": true,
+    "tool_match": false,
     "answer_match": true
   },
   {
     "id": "action_insufficient",
     "tools": [
-      "submit_leave_request"
+      "vector_search_hr_policy"
     ],
-    "tool_match": true,
-    "answer_match": true
+    "tool_match": false,
+    "answer_match": false
   },
   {
     "id": "missing_args",

@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="HR RAG Agent", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Clerk", version="0.1.0", lifespan=lifespan)
 UI_DIR = Path(__file__).resolve().parent / "ui"
 if UI_DIR.exists():
     app.mount("/ui", StaticFiles(directory=UI_DIR, html=True), name="ui")
