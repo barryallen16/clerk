@@ -8,3 +8,4 @@ eval/run.log
 eval/done.flag
 *.db
 *.egg-info
+teach/
